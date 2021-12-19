@@ -1007,13 +1007,12 @@ static Tensor getPaddedTensor2D(mlir::Type elemTy,
 
 static Tensor addBias2D(mlir::Type elemTy, 
                         vector<Expr> dims,
+                        vector<Expr> ind,
                         Tensor acc, Tensor bias) {
-  vector<Expr> outInd = Index::boundIndexVars(acc.getRank());
-  auto biasf = Float(bias.get({outInd[3]}).first, elemTy);
-  auto tf = Float(acc.get(outInd).first, elemTy);
-
+  auto biasf = Float(bias.get({ind[3]}).first, elemTy);
+  auto tf = Float(acc.get(ind).first, elemTy);
   return Tensor::mkInitializedLambda(
-            elemTy, move(dims), move(outInd), 
+            elemTy, move(dims), move(ind), 
             tf.add(biasf)
           );
 }
@@ -1070,7 +1069,7 @@ void encodeOp(State &st, mlir::tosa::DepthwiseConv2DOp op, bool) {
   // NxOHxOWx(C*M)
   vector<Expr> outDims = {N, tDims[1], tDims[2], C * M};
 
-  auto output = addBias2D(elemTy, outDims, t, bias);
+  auto output = addBias2D(elemTy, outDims, outInd, t, bias);
   
   st.wellDefined(op, input.isFullyInitialized());
   st.wellDefined(op, weight.isFullyInitialized());
@@ -1105,7 +1104,9 @@ void encodeOp(State &st, mlir::tosa::Conv2DOp op, bool) {
                       strides, dilations, ShapedValue::ConvLayout::NHWC_FHWC);
 
   vector<Expr> outDims = t.getDims();
-  auto output = addBias2D(elemTy, outDims, t, bias);
+  vector<Expr> outInd = Index::boundIndexVars(4);
+
+  auto output = addBias2D(elemTy, outDims, outInd, t, bias);
 
   st.wellDefined(op, input.isFullyInitialized());
   st.wellDefined(op, weight.isFullyInitialized());
